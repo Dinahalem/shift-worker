@@ -1,12 +1,17 @@
+#This program serves workers on a shifts schedule
+# Data: there are 3 shifts (s), 5 workers (w), 7 days (d)
+# each worker has one shift per day
+
+
 from ortools.sat.python import cp_model
 
 
 def main():
     # Data.
-    num_nurses = 5
+    num_workers = 5
     num_shifts = 3
     num_days = 7
-    all_nurses = range(num_nurses)
+    all_workers = range(num_workers)
     all_shifts = range(num_shifts)
    
     all_days = range(num_days)
@@ -15,40 +20,40 @@ def main():
     model = cp_model.CpModel()
 
     # Creates shift variables.
-    # shifts[(n, d, s)]: nurse 'n' works shift 's' on day 'd'.
+    # shifts[(n, d, s)]: worker 'w' works shift 's' on day 'd'.
     shifts = {}
-    for n in all_nurses:
+    for w in all_workers:
         for d in all_days:
             for s in all_shifts:
-                shifts[(n, d,
-                        s)] = model.NewBoolVar('shift_n%id%is%i' % (n, d, s))
+                shifts[(w, d,
+                        s)] = model.NewBoolVar('shift_w%id%is%i' % (w, d, s))
 
-    # Each shift is assigned to exactly one nurse in the schedule period.
+    # Each shift is assigned to exactly one worker in the schedule period.
     for d in all_days:
         for s in all_shifts:
-            model.AddExactlyOne(shifts[(n, d, s)] for n in all_nurses)
+            model.AddExactlyOne(shifts[(w, d, s)] for w in all_workers)
 
-    # Each nurse works at most one shift per day.
-    for n in all_nurses:
+    # Each worker works at most one shift per day.
+    for w in all_workers:
         for d in all_days:
-            model.AddAtMostOne(shifts[(n, d, s)] for s in all_shifts)
+            model.AddAtMostOne(shifts[(w, d, s)] for s in all_shifts)
 
-    # Try to distribute the shifts evenly, so that each nurse works
-    # min_shifts_per_nurse shifts. If this is not possible, because the total
-    # number of shifts is not divisible by the number of nurses, some nurses will
+    # Try to distribute the shifts evenly, so that each worker works
+    # min_shifts_per_worker shifts. If this is not possible, because the total
+    # number of shifts is not divisible by the number of workers, some workers will
     # be assigned one more shift.
-    min_shifts_per_nurse = (num_shifts * num_days) // num_nurses
-    if num_shifts * num_days % num_nurses == 0:
-        max_shifts_per_nurse = min_shifts_per_nurse
+    min_shifts_per_worker = (num_shifts * num_days) // num_workers
+    if num_shifts * num_days % num_workers == 0:
+        max_shifts_per_worker = min_shifts_per_worker
     else:
-        max_shifts_per_nurse = min_shifts_per_nurse + 1
-    for n in all_nurses:
+        max_shifts_per_worker = min_shifts_per_worker + 1
+    for w in all_workers:
         shifts_worked = []
         for d in all_days:
             for s in all_shifts:
-                shifts_worked.append(shifts[(n, d, s)])
-        model.Add(min_shifts_per_nurse <= sum(shifts_worked))
-        model.Add(sum(shifts_worked) <= max_shifts_per_nurse)
+                shifts_worked.append(shifts[(w, d, s)])
+        model.Add(min_shifts_per_worker <= sum(shifts_worked))
+        model.Add(sum(shifts_worked) <= max_shifts_per_worker)
 
     # Creates the solver and solve.
     solver = cp_model.CpSolver()
@@ -57,13 +62,13 @@ def main():
     solver.parameters.enumerate_all_solutions = True
 
 
-    class NursesPartialSolutionPrinter(cp_model.CpSolverSolutionCallback):
+    class WorkersPartialSolutionPrinter(cp_model.CpSolverSolutionCallback):
         """Print intermediate solutions."""
 
-        def __init__(self, shifts, num_nurses, num_days, num_shifts, limit):
+        def __init__(self, shifts, num_workers, num_days, num_shifts, limit):
             cp_model.CpSolverSolutionCallback.__init__(self)
             self._shifts = shifts
-            self._num_nurses = num_nurses
+            self._num_workers = num_workers
             self._num_days = num_days
             self._num_shifts = num_shifts
             self._solution_count = 0
@@ -74,14 +79,14 @@ def main():
             print('Solution %i' % self._solution_count)
             for d in range(self._num_days):
                 print('Day %i' % d)
-                for n in range(self._num_nurses):
+                for w in range(self._num_workers):
                     is_working = False
                     for s in range(self._num_shifts):
-                        if self.Value(self._shifts[(n, d, s)]):
+                        if self.Value(self._shifts[(w, d, s)]):
                             is_working = True
-                            print('  Nurse %i works shift %i' % (n, s))
+                            print('  Worker %i works shift %i' % (w, s))
                     if not is_working:
-                        print('  Nurse {} does not work'.format(n))
+                        print('  Worker {} does not work'.format(w))
             if self._solution_count >= self._solution_limit:
                 print('Stop search after %i solutions' % self._solution_limit)
                 self.StopSearch()
@@ -91,7 +96,7 @@ def main():
 
     # Display the first five solutions.
     solution_limit = 5
-    solution_printer = NursesPartialSolutionPrinter(shifts, num_nurses,
+    solution_printer = WorkersPartialSolutionPrinter(shifts, num_workers,
                                                     num_days, num_shifts,
                                                     solution_limit)
 
